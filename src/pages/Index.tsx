@@ -1,13 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React, { useState, useEffect } from 'react';
+import SplashScreen from '@/components/SplashScreen';
+import Dashboard from './Dashboard';
 
 const Index = () => {
+  const [showSplash, setShowSplash] = useState(true);
+  
+  // Check if we've shown the splash screen before
+  useEffect(() => {
+    const hasShownSplash = localStorage.getItem('splashShown');
+    if (hasShownSplash) {
+      setShowSplash(false);
+    } else {
+      // If it's the first visit, set the flag after showing splash
+      const timer = setTimeout(() => {
+        localStorage.setItem('splashShown', 'true');
+      }, 2500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <>
+      {showSplash ? (
+        <SplashScreen onFinish={() => setShowSplash(false)} />
+      ) : (
+        <Dashboard />
+      )}
+    </>
   );
 };
 
