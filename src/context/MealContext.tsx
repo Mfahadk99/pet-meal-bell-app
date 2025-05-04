@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { toast as sonnerToast } from '@/components/ui/sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import moment from 'moment-timezone';
 
 export type Meal = {
   id: string;
@@ -223,21 +224,25 @@ export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check if any meal is due
   useEffect(() => {
+
     const checkMealAlerts = () => {
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      
+    
+      // Local date in YYYY-MM-DD
+      const today = moment(now).format('YYYY-MM-DD');
+    
+      const currentTime = moment.tz(now, "Asia/Karachi").format('HH:mm');
+    
       meals.forEach(meal => {
-        if (meal.date === today && meal.time === currentTime && !meal.completed) {
-          // It's time for a meal!
+        const mealTime = moment(meal.time, 'HH:mm:ss').format('HH:mm')
+    
+        if (meal.date === today && mealTime === currentTime && !meal.completed) {
           toast({
             title: `Time to feed: ${meal.name}`,
             description: "Your pet's meal time is now!",
             duration: 10000,
           });
-          
-          // Show a more prominent toast with Sonner
+    
           sonnerToast(`Time for ${meal.name}!`, {
             description: "Your pet is waiting for their meal",
             action: {
@@ -246,13 +251,13 @@ export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children
             },
             duration: 10000
           });
-          
-          // Play a sound
+    
           const audio = new Audio('/meal-alarm.mp3');
           audio.play().catch(e => console.log('Audio play error:', e));
         }
       });
     };
+    
 
     const intervalId = setInterval(checkMealAlerts, 20000);
     return () => clearInterval(intervalId);
