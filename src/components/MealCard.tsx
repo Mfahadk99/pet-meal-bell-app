@@ -1,15 +1,15 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Calendar, Check } from "lucide-react";
+import { Clock, Calendar, Check, Loader2 } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { Meal } from '@/context/MealContext';
 
 interface MealCardProps {
   meal: Meal;
-  onComplete?: () => void;
-  onDelete?: () => void;
+  onComplete?: () => Promise<void>;
+  onDelete?: () => Promise<void>;
   showActions?: boolean;
 }
 
@@ -28,7 +28,35 @@ const MealCard: React.FC<MealCardProps> = ({
   onDelete,
   showActions = true
 }) => {
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isToday = new Date(meal.date).toDateString() === new Date().toDateString();
+  
+  const handleComplete = async () => {
+    if (!onComplete) return;
+    
+    setIsCompleting(true);
+    try {
+      await onComplete();
+    } catch (error) {
+      console.error("Error completing meal:", error);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+  
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await onDelete();
+    } catch (error) {
+      console.error("Error deleting meal:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   
   return (
     <Card className={cn(
@@ -62,9 +90,14 @@ const MealCard: React.FC<MealCardProps> = ({
               variant="ghost" 
               size="sm" 
               className="text-green-500 hover:text-green-700 hover:bg-green-50"
-              onClick={onComplete}
+              onClick={handleComplete}
+              disabled={isCompleting}
             >
-              <Check className="w-4 h-4" />
+              {isCompleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
             </Button>
           </div>
         )}
@@ -83,9 +116,14 @@ const MealCard: React.FC<MealCardProps> = ({
               variant="ghost" 
               size="sm" 
               className="text-destructive hover:bg-destructive/10"
-              onClick={onDelete}
+              onClick={handleDelete}
+              disabled={isDeleting}
             >
-              Delete
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              ) : (
+                'Delete'
+              )}
             </Button>
           )}
         </div>

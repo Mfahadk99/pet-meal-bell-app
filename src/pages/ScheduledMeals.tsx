@@ -4,10 +4,38 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import MealCard from '@/components/MealCard';
 import AddMealForm from '@/components/AddMealForm';
 import { useMeals } from '@/context/MealContext';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const ScheduledMeals: React.FC = () => {
-  const { scheduledMeals, completeMeal, deleteMeal } = useMeals();
+  const { scheduledMeals, completeMeal, deleteMeal, isLoading, isError, refetch } = useMeals();
+  
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6 max-w-md flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-pet-primary mb-2" />
+        <p className="text-pet-muted">Loading scheduled meals...</p>
+      </div>
+    );
+  }
+  
+  if (isError) {
+    return (
+      <div className="container mx-auto py-6 max-w-md">
+        <Card className="mb-6 border-red-300">
+          <CardContent className="py-6">
+            <div className="text-center">
+              <p className="text-red-500 mb-4">There was an error loading your scheduled meals</p>
+              <Button onClick={() => refetch()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   // Group meals by date
   const mealsByDate = scheduledMeals.reduce((acc, meal) => {

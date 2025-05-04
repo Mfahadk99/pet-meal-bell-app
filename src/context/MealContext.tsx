@@ -1,6 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
+import { toast as sonnerToast } from '@/components/ui/sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export type Meal = {
   id: string;
@@ -9,39 +12,181 @@ export type Meal = {
   completed: boolean;
   date: string; // Format: YYYY-MM-DD
   notes?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type MealContextType = {
   meals: Meal[];
-  addMeal: (meal: Omit<Meal, 'id' | 'completed'>) => void;
-  updateMeal: (id: string, meal: Partial<Meal>) => void;
-  deleteMeal: (id: string) => void;
-  completeMeal: (id: string) => void;
+  addMeal: (meal: Omit<Meal, 'id' | 'completed'>) => Promise<void>;
+  updateMeal: (id: string, meal: Partial<Meal>) => Promise<void>;
+  deleteMeal: (id: string) => Promise<void>;
+  completeMeal: (id: string) => Promise<void>;
   scheduledMeals: Meal[];
   upcomingMeal: Meal | null;
   historyMeals: Meal[];
   todayMeals: Meal[];
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => Promise<void>;
 };
 
 const MealContext = createContext<MealContextType | undefined>(undefined);
 
 export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [meals, setMeals] = useState<Meal[]>([]);
   const [upcomingMeal, setUpcomingMeal] = useState<Meal | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  // Load meals from localStorage on mount
-  useEffect(() => {
-    const savedMeals = localStorage.getItem('pet-meals');
-    if (savedMeals) {
-      setMeals(JSON.parse(savedMeals));
+  // Fetch meals from Supabase
+  const { 
+    data: meals = [], 
+    isLoading, 
+    isError, 
+    refetch: refetchMeals 
+  } = useQuery({
+    queryKey: ['meals'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pet_meals')
+        .select('*')
+        .order('date', { ascending: true })
+        .order('time', { ascending: true });
+      
+      if (error) {
+        throw new Error(`Error fetching meals: ${error.message}`);
+      }
+      
+      return data as Meal[];
     }
-  }, []);
+  });
 
-  // Save meals to localStorage whenever meals change
-  useEffect(() => {
-    localStorage.setItem('pet-meals', JSON.stringify(meals));
-  }, [meals]);
+  // Mutations for CRUD operations
+  const addMealMutation = useMutation({
+    mutationFn: async (newMeal: Omit<Meal, 'id' | 'completed'>) => {
+      const { data, error } = await supabase
+        .from('pet_meals')
+        .insert([{ 
+          name: newMeal.name, 
+          time: newMeal.time, 
+          date: newMeal.date,
+          notes: newMeal.notes || null,
+          completed: false
+        }])
+        .select('*')
+        .single();
+      
+      if (error) {
+        throw new Error(`Error adding meal: ${error.message}`);
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meals'] });
+      toast({
+        title: "Meal scheduled",
+        description: "Your pet's meal has been scheduled successfully.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error scheduling meal",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateMealMutation = useMutation({
+    mutationFn: async ({ id, meal }: { id: string, meal: Partial<Meal> }) => {
+      const { data, error } = await supabase
+        .from('pet_meals')
+        .update(meal)
+        .eq('id', id)
+        .select('*')
+        .single();
+      
+      if (error) {
+        throw new Error(`Error updating meal: ${error.message}`);
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meals'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error updating meal",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteMealMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('pet_meals')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        throw new Error(`Error deleting meal: ${error.message}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meals'] });
+      toast({
+        title: "Meal deleted",
+        description: "The meal has been removed from the schedule",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error deleting meal",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const completeMealMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('pet_meals')
+        .update({ completed: true })
+        .eq('id', id)
+        .select('*')
+        .single();
+      
+      if (error) {
+        throw new Error(`Error completing meal: ${error.message}`);
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['meals'] });
+      toast({
+        title: "Meal completed",
+        description: "Great job feeding your pet!",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error completing meal",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Refetch function to manually trigger meal data refresh
+  const refetch = async () => {
+    await refetchMeals();
+  };
 
   // Check for upcoming meals
   useEffect(() => {
@@ -92,6 +237,16 @@ export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children
             duration: 10000,
           });
           
+          // Show a more prominent toast with Sonner
+          sonnerToast(`Time for ${meal.name}!`, {
+            description: "Your pet is waiting for their meal",
+            action: {
+              label: "Mark as Fed",
+              onClick: () => completeMeal(meal.id)
+            },
+            duration: 10000
+          });
+          
           // Play a sound
           const audio = new Audio('/meal-alarm.mp3');
           audio.play().catch(e => console.log('Audio play error:', e));
@@ -102,48 +257,6 @@ export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const intervalId = setInterval(checkMealAlerts, 20000);
     return () => clearInterval(intervalId);
   }, [meals, toast]);
-
-  const addMeal = (meal: Omit<Meal, 'id' | 'completed'>) => {
-    const newMeal: Meal = {
-      ...meal,
-      id: Date.now().toString(),
-      completed: false,
-    };
-    
-    setMeals(prev => [...prev, newMeal]);
-    toast({
-      title: "Meal scheduled",
-      description: `${meal.name} has been scheduled for ${meal.time}`,
-    });
-  };
-
-  const updateMeal = (id: string, updatedMeal: Partial<Meal>) => {
-    setMeals(prev => 
-      prev.map(meal => 
-        meal.id === id ? { ...meal, ...updatedMeal } : meal
-      )
-    );
-  };
-
-  const deleteMeal = (id: string) => {
-    setMeals(prev => prev.filter(meal => meal.id !== id));
-    toast({
-      title: "Meal deleted",
-      description: "The meal has been removed from the schedule",
-    });
-  };
-
-  const completeMeal = (id: string) => {
-    setMeals(prev => 
-      prev.map(meal => 
-        meal.id === id ? { ...meal, completed: true } : meal
-      )
-    );
-    toast({
-      title: "Meal completed",
-      description: "Great job feeding your pet!",
-    });
-  };
 
   // Get today's meals
   const todayMeals = meals.filter(
@@ -179,6 +292,26 @@ export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return b.time.localeCompare(a.time);
   });
 
+  // Add a meal
+  const addMeal = async (meal: Omit<Meal, 'id' | 'completed'>) => {
+    await addMealMutation.mutateAsync(meal);
+  };
+
+  // Update a meal
+  const updateMeal = async (id: string, meal: Partial<Meal>) => {
+    await updateMealMutation.mutateAsync({ id, meal });
+  };
+
+  // Delete a meal
+  const deleteMeal = async (id: string) => {
+    await deleteMealMutation.mutateAsync(id);
+  };
+
+  // Complete a meal
+  const completeMeal = async (id: string) => {
+    await completeMealMutation.mutateAsync(id);
+  };
+
   return (
     <MealContext.Provider 
       value={{ 
@@ -190,7 +323,10 @@ export const MealProvider: React.FC<{ children: React.ReactNode }> = ({ children
         scheduledMeals,
         upcomingMeal,
         historyMeals,
-        todayMeals
+        todayMeals,
+        isLoading,
+        isError,
+        refetch
       }}
     >
       {children}

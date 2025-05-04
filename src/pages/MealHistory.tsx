@@ -3,10 +3,38 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import MealCard from '@/components/MealCard';
 import { useMeals } from '@/context/MealContext';
-import { Calendar } from 'lucide-react';
+import { Calendar, Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const MealHistory: React.FC = () => {
-  const { historyMeals } = useMeals();
+  const { historyMeals, isLoading, isError, refetch } = useMeals();
+  
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6 max-w-md flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-pet-primary mb-2" />
+        <p className="text-pet-muted">Loading meal history...</p>
+      </div>
+    );
+  }
+  
+  if (isError) {
+    return (
+      <div className="container mx-auto py-6 max-w-md">
+        <Card className="mb-6 border-red-300">
+          <CardContent className="py-6">
+            <div className="text-center">
+              <p className="text-red-500 mb-4">There was an error loading your meal history</p>
+              <Button onClick={() => refetch()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   // Group meals by date
   const mealsByDate = historyMeals.reduce((acc, meal) => {

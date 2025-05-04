@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useMeals } from '@/context/MealContext';
+import { Loader2 } from 'lucide-react';
 
 const AddMealForm: React.FC = () => {
   const { addMeal } = useMeals();
@@ -14,29 +15,38 @@ const AddMealForm: React.FC = () => {
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!name || !time || !date) {
       return;
     }
     
-    addMeal({
-      name,
-      time,
-      date,
-      notes
-    });
+    setIsSubmitting(true);
     
-    // Reset form
-    setName('');
-    setTime('');
-    setDate(new Date().toISOString().split('T')[0]);
-    setNotes('');
-    
-    // Close dialog
-    setOpen(false);
+    try {
+      await addMeal({
+        name,
+        time,
+        date,
+        notes
+      });
+      
+      // Reset form
+      setName('');
+      setTime('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setNotes('');
+      
+      // Close dialog
+      setOpen(false);
+    } catch (error) {
+      console.error("Error adding meal:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   // Set default date to today when opening the form
@@ -103,8 +113,19 @@ const AddMealForm: React.FC = () => {
             />
           </div>
           
-          <Button type="submit" className="w-full">
-            Schedule Meal
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Scheduling...
+              </>
+            ) : (
+              'Schedule Meal'
+            )}
           </Button>
         </form>
       </DialogContent>

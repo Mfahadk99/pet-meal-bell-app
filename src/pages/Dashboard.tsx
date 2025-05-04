@@ -4,10 +4,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import MealCard from '@/components/MealCard';
 import AddMealForm from '@/components/AddMealForm';
 import { useMeals } from '@/context/MealContext';
-import { AlarmClockCheck, CalendarClock } from 'lucide-react';
+import { AlarmClockCheck, CalendarClock, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const Dashboard: React.FC = () => {
-  const { todayMeals, upcomingMeal, completeMeal, deleteMeal } = useMeals();
+  const { 
+    todayMeals, 
+    upcomingMeal, 
+    completeMeal, 
+    deleteMeal, 
+    isLoading,
+    isError,
+    refetch
+  } = useMeals();
+  
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6 max-w-md flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-pet-primary mb-2" />
+        <p className="text-pet-muted">Loading meals...</p>
+      </div>
+    );
+  }
+  
+  if (isError) {
+    return (
+      <div className="container mx-auto py-6 max-w-md">
+        <Card className="mb-6 border-red-300">
+          <CardContent className="py-6">
+            <div className="text-center">
+              <p className="text-red-500 mb-4">There was an error loading your meal data</p>
+              <Button onClick={() => refetch()}>Try Again</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   
   return (
     <div className="container mx-auto py-6 max-w-md">
